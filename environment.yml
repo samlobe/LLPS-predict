@@ -1,0 +1,20 @@
+name: amyloidPredict
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn=1.5.1
+  - pytorch
+  - tqdm
+  - joblib
+  - seaborn
+  - statsmodels
+  - pip
+  - pip:
+      - fair-esm==2.0.0
+      - obonet==1.1.0
+
