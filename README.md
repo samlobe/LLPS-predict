@@ -1,12 +1,12 @@
 # LLPSpredict
-This model was trained to predict intrinsically disordered proteins (IDPs) or intrinsically disordered regions (IDRs) that drive LLPS using an ESM2-based classification model. The training data was from the CD-CODE database, and the human IDR sequences are from Tesei, et. al. 2024 (see their repo [here](https://github.com/KULL-Centre/_2023_Tesei_IDRome/tree/main)).
+This model was trained to predict intrinsically disordered proteins (IDPs) or intrinsically disordered regions (IDRs) that drive LLPS using an ESM2-based classification model. The training data was from the CD-CODE database (see [paper](https://doi.org/10.1038/s41592-023-01831-0) and [website](https://cd-code.org/)), and the human IDR sequences are from Tesei, et. al. 2024 (see their repo [here](https://github.com/KULL-Centre/_2023_Tesei_IDRome/tree/main)).
 
 ## Quick Start 
 Use a computer that has 12+ GB of RAM. It works well on my 16GB RAM Mac CPU, but is way faster on my 24GB VRAM GPU.  
 
 ```bash
-conda create -n amyloidPredict python=3.9
-conda activate amyloidPredict
+conda create -n LLPS-predict python=3.9
+conda activate LLPS-predict
 pip install fair-esm # install esm (to get embeddings from 3B parameter ESM2 model)
 conda install pytorch pandas scikit-learn=1.5.1 matplotlib tqdm 
 ```
@@ -38,7 +38,7 @@ Extracting ESM embeddings with **predict.py** is reasonably fast on my Mac's CPU
 The easiest/smartest way to extract ESM embeddings for hundreds or thousands of sequences is with the **extract.py** tool, which I altered slightly from the ESM repo. See their original documentation [here](https://github.com/facebookresearch/esm), or do `python extract.py -h` to see how to use it. Make sure to output the mean representations of the embeddings with the `--include mean` flag. 
 
 ## How it works
-I found 172 LLPS driver proteins on CD-CODE. I considered all human IDRs that were part of those proteins to be positive samples: 180 IDRs. Then I considered all other human IDRs to be negative samples. 
+I found 172 LLPS driver proteins on CD-CODE (using the API with [code](https://github.com/KULL-Centre/_2023_Tesei_IDRome/blob/main/CD-CODE.ipynb) from Tesei, et. al.). I considered all human IDRs that were part of those proteins to be positive samples: 180 IDRs. Then I considered all other human IDRs to be negative samples. 
 I weighted each class evenly and fit a logistic regression model on the IDRs' mean embeddings (from ESM2 3B model). I held out 20% of each class for validation and did feature selection (with L1 regularization) and regularization (i.e. L2 regularization on selected features) on the training data, resulting in a ROC AUC = 0.87 on the validation set. Then I retrained on all the data for the final model. Note that these IDRs have variable sizes.
 
 To simplify how it works, it's like we use the protein language model (ESM2 3B) to generate a "bar code" for the protein, and then use a simple logistic regression model to predict LLPS propensity from the "bar code".
