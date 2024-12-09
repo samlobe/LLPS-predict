@@ -67,7 +67,7 @@ for C1 in tqdm(C1_values):
             X_val_fold_selected = X_val_fold_scaled[:, non_zero_indices]
 
             # L2 logistic regression
-            lr_l2 = LogisticRegression(penalty='l2', C=C2, solver='lbfgs', max_iter=10000)
+            lr_l2 = LogisticRegression(penalty='l2', C=C2, solver='lbfgs', max_iter=10000, class_weight='balanced')
             lr_l2.fit(X_train_fold_selected, y_train_fold)
 
             # Predict probabilities on validation fold and store scores
@@ -108,7 +108,7 @@ print(f"Number of non-zero coefficients: {len(non_zero_indices)}")
 X_train_selected = X_train_scaled[:, non_zero_indices]
 
 # L2 logistic regression
-lr_l2 = LogisticRegression(penalty='l2', C=best_C2, solver='lbfgs', max_iter=10000)
+lr_l2 = LogisticRegression(penalty='l2', C=best_C2, solver='lbfgs', max_iter=10000, class_weight='balanced')
 lr_l2.fit(X_train_selected, y_train)
 
 # Apply to validation set
@@ -172,7 +172,7 @@ X_full_scaled = scaler.transform(X_full)  # Use the scaler fitted earlier on X_t
 X_full_selected = X_full_scaled[:, non_zero_indices]
 
 # Retrain the final model on the full dataset using the selected features
-lr_final = LogisticRegression(penalty='l2', C=best_C2, solver='lbfgs', max_iter=10000)
+lr_final = LogisticRegression(penalty='l2', C=best_C2, solver='lbfgs', max_iter=10000, class_weight='balanced')
 lr_final.fit(X_full_selected, y_full)
 
 # Save the scaler, feature indices, and the trained model using joblib

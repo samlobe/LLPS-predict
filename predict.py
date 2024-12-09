@@ -117,15 +117,16 @@ def main():
 
     # Predict LLPS propensity
     predictions = LR_model.predict_proba(embeddings_selected)[:, 1]
-    print(f"LLPS probabilities: {predictions})
-    
+    if len(names) == 1:
+	    print(f"LLPS probabilities: {predictions[0]:.4f}")
+
     # Save predictions to CSV
     results_df = pd.DataFrame({'Name': names, 'LLPS Score': predictions})
     results_df.to_csv(args.output, index=False)
     print(f"Predictions saved to {args.output}")
     
     # Plot if more than one sequence
-    if len(names) > 1:
+    if len(names) > 1 and len(names) < 100:
         plt.bar(names, predictions)
         plt.xlabel('Protein')
         plt.ylabel('LLPS Score')
