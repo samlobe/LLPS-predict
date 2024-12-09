@@ -117,6 +117,7 @@ def main():
 
     # Predict LLPS propensity
     predictions = LR_model.predict_proba(embeddings_selected)[:, 1]
+    print(f"LLPS probabilities: {predictions})
     
     # Save predictions to CSV
     results_df = pd.DataFrame({'Name': names, 'LLPS Score': predictions})
