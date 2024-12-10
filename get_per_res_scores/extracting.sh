@@ -1,0 +1,9 @@
+python extract.py esm2_t36_3B_UR50D tau_10aa_peptides.fasta tau_10aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_15aa_peptides.fasta tau_15aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_20aa_peptides.fasta tau_20aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_25aa_peptides.fasta tau_25aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_30aa_peptides.fasta tau_30aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_35aa_peptides.fasta tau_35aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_40aa_peptides.fasta tau_40aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_45aa_peptides.fasta tau_45aa_peptides --include mean
+python extract.py esm2_t36_3B_UR50D tau_50aa_peptides.fasta tau_50aa_peptides --include mean

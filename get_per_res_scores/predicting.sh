@@ -1,0 +1,9 @@
+python predict.py --embeddingsDir tau_10aa_peptides -o tau_10aa_peptides.csv
+python predict.py --embeddingsDir tau_15aa_peptides -o tau_15aa_peptides.csv
+python predict.py --embeddingsDir tau_20aa_peptides -o tau_20aa_peptides.csv
+python predict.py --embeddingsDir tau_25aa_peptides -o tau_25aa_peptides.csv
+python predict.py --embeddingsDir tau_30aa_peptides -o tau_30aa_peptides.csv
+python predict.py --embeddingsDir tau_35aa_peptides -o tau_35aa_peptides.csv
+python predict.py --embeddingsDir tau_40aa_peptides -o tau_40aa_peptides.csv
+python predict.py --embeddingsDir tau_45aa_peptides -o tau_45aa_peptides.csv
+python predict.py --embeddingsDir tau_50aa_peptides -o tau_50aa_peptides.csv
