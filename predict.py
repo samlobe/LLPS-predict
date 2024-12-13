@@ -123,7 +123,7 @@ def main():
     # Save predictions to CSV
     results_df = pd.DataFrame({'Name': names, 'LLPS Score': predictions})
     results_df.to_csv(args.output, index=False)
-    print(f"Predictions saved to {args.output}")
+    print(f"LLPS predictions saved to {args.output}")
     
     # Plot if more than one sequence
     if len(names) > 1 and len(names) < 100:
