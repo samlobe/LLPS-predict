@@ -31,22 +31,5 @@ for cd_item in tqdm(dict_cd['data']):
 tok = time()
 print(f"Time elapsed: {tok-tik:.0f} seconds")
 
-#%%
-# Fetch members
-tik = time()
-members = np.empty(0)
-
-for cd_item in tqdm(dict_cd['data']):
-    api_url = f"https://cd-code.org/api/condensates/{cd_item['uid']:s}"
-    headers = {"Authorization": "b537fe97ad384aea9cbfd7b25b38938a"}
-    payload = {"page": 1, "size": 249}
-    response = requests.get(api_url, headers=headers, params=payload)
-    dict_uid = json.loads(response.content.decode())['data']['protein_functional_type']
-    members = np.append(members,[i.split('-')[0] for i in dict_uid if dict_uid[i]=="member"])
-tok = time()
-print(f"Time elapsed: {tok-tik:.0f} seconds")
-#%%
 # save drivers and members to separate csv files
 np.savetxt("drivers.csv", drivers, fmt="%s", delimiter=",")
-np.savetxt("members.csv", members, fmt="%s", delimiter=",")
-#%%

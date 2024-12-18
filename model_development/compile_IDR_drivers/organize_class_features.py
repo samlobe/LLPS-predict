@@ -5,12 +5,15 @@ import numpy as np
 from tqdm import tqdm
 
 ESM_model = 'esm2_3B'; layers = 36; embeddings_dir = '../IDR_embeddings'
+
+# ignore this - I had used it to organize the driver embeddings from a few other models' embeddings 
 # ESM_model = 'esm2_650M'; layers = 33; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esm2_650M_IDRome_embeddings'
 # ESM_model = 'esm3-large-2024-03'; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esm3-large-2024-03_IDRome_embeddings'
-# ESM_model = 'esm3-small-2024-03'; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esm3-medium-2024-03_IDRome_embeddings'
+# ESM_model = 'esm3-small-2024-08'; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esm3-medium-2024-08_IDRome_embeddings'
 # ESM_model = 'esmc-6b'; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esmc-6b-2024-12_IDRome_embeddings'
 # ESM_model = 'esmc-300m'; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esmc_300m_IDRome_embeddings.npy'
 # ESM_model = 'esmc-600m'; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esmc_600m_IDRome_embeddings.npy'
+# ESM_model = 'esm3-small-open'; embeddings_dir = '/home/sam/Research/ESM3/IDRome_embeddings/esm3-small-open_IDRome_embeddings'
 
 # 118 LLPS drive proteins from CD-CODE
 drivers = list(pd.read_csv('drivers.csv', index_col=0, header=None).index)
@@ -45,7 +48,18 @@ else:
                 driver_embeddings[IDR] = torch.load(f'{embeddings_dir}/{IDR}.pt')['mean_representations'][layers].cpu().numpy()
             else:
                 non_driver_embeddings[IDR] = torch.load(f'{embeddings_dir}/{IDR}.pt')['mean_representations'][layers].cpu().numpy()
-        # else:
+        elif ESM_model == 'esm3-small-open':
+            if IDR_name in drivers:
+                try:
+                    driver_embeddings[IDR] = np.load(f"{embeddings_dir}/{IDR}.npy")
+                except:
+                    print(f'{IDR} not found')
+            else:
+                try:
+                    non_driver_embeddings[IDR] = np.load(f"{embeddings_dir}/{IDR}.npy")
+                except:
+                    print(f'{IDR} not found')
+
         elif ESM_model[:4] == 'esm3' or ESM_model == 'esmc-6b':
             if IDR_name in drivers:
                 try:
