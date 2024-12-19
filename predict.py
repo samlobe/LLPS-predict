@@ -8,16 +8,17 @@ import numpy as np
 import os
 from time import time
 import matplotlib.pyplot as plt
+import glob
 
-# Set up argument parser
 parser = argparse.ArgumentParser(description='Predict LLPS propensity of a peptide or protein (designed for IDRs).')
-parser.add_argument('--sequence', '-s', help='Protein sequence (or a .fasta file) for which embeddings will be generated. Use this if you do not have embeddings.')
-parser.add_argument('--embeddingsDir', help='Directory containing .pt embeddings files for protein sequences.')
-parser.add_argument('--embeddingsFile', help='Single .pt file containing embeddings for a sequence.')
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument('--sequence', '-s', help='Protein sequence or a .fasta file for which embeddings will be generated. Use this if you do not have embeddings.')
+group.add_argument('--embeddingsFiles', nargs='+', help='One or more pre-computed ESM embeddings files (.pt) with "mean_representations". Accepts glob patterns (e.g. "*.pt").')
+
 parser.add_argument('--LR_model', help='Logistic Regression model file (.joblib) for LLPS prediction.', default='model_development/LLPS_model_latest.joblib')
 parser.add_argument('--output', '-o', help='Output CSV file for predictions. Default is LLPS_propensity.csv', default='LLPS_propensity.csv')
 parser.add_argument('--nogpu', action='store_true', help='Disable GPU usage if you encounter memory issues.')
-parser.add_argument('--ESM_model', help='ESM model to use for generating embeddings. Options: 3B (may add other models later)', default='3B')
+parser.add_argument('--ESM_model', help='ESM model to use for generating embeddings. Options: 3B', default='3B')
 parser.add_argument('--embeddings_output', help='If you want to save the generated embeddings, provide a file name. Will save as .npy')
 
 args = parser.parse_args()
@@ -72,7 +73,7 @@ def load_embeddings_from_pt_file(pt_file, layer):
         embeddings = data['mean_representations'][layer].numpy()
         return embeddings[np.newaxis, :], os.path.splitext(os.path.basename(pt_file))[0]
     else:
-        raise ValueError(f"The .pt file {pt_file} does not contain the required 'mean_representations' or layer {layer}.")
+        raise ValueError(f"The .pt file {pt_file} does not contain the required 'mean_representations' or layer {layer}.\nMake sure to use the `--include mean` flag when extracting embeddings with extract.py")
 
 # Main function to process input and generate predictions
 def main():
@@ -87,21 +88,34 @@ def main():
             np.save(args.embeddings_output, embeddings)
             print(f"Embeddings saved to {args.embeddings_output}")
     
-    # Load embeddings from .pt file or directory
-    elif args.embeddingsFile:
+    # If using pre-computed embeddings files
+    elif args.embeddingsFiles:
         esm_model, alphabet, layer = load_esm_model(args.ESM_model)
-        embeddings, names = load_embeddings_from_pt_file(args.embeddingsFile, layer)
+        # Expand glob patterns
+        all_files = []
+        for pattern in args.embeddingsFiles:
+            matched = glob.glob(pattern)
+            if not matched:
+                print(f"Warning: No files matched the pattern {pattern}")
+            all_files.extend(matched)
+        
+        if not all_files:
+            raise ValueError("No embeddings files found. Please check your patterns.")
 
-    elif args.embeddingsDir:
-        esm_model, alphabet, layer = load_esm_model(args.ESM_model)
-        embeddings = []
+        embeddings_list = []
         names = []
-        for file in os.listdir(args.embeddingsDir):
-            if file.endswith('.pt'):
-                emb, name = load_embeddings_from_pt_file(os.path.join(args.embeddingsDir, file), layer)
-                embeddings.append(emb)
+        for pt_file in all_files:
+            if pt_file.endswith('.pt'):
+                emb, name = load_embeddings_from_pt_file(pt_file, layer)
+                embeddings_list.append(emb)
                 names.append(name)
-        embeddings = np.vstack(embeddings)
+            else:
+                print(f"Warning: {pt_file} is not a .pt file. Skipping.")
+
+        if not embeddings_list:
+            raise ValueError("No valid .pt embeddings files found.")
+        
+        embeddings = np.vstack(embeddings_list)
     
     # Load Logistic Regression model
     loaded_data = joblib.load(args.LR_model)
@@ -119,7 +133,7 @@ def main():
     predictions = LR_model.predict_proba(embeddings_selected)[:, 1]
     if len(names) == 1:
 	    print(f"LLPS probabilities: {predictions[0]:.4f}")
-
+    
     # Save predictions to CSV
     results_df = pd.DataFrame({'Name': names, 'LLPS Score': predictions})
     results_df.to_csv(args.output, index=False)
