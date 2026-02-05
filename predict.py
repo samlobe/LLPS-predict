@@ -20,6 +20,7 @@ parser.add_argument('--output', '-o', help='Output CSV file for predictions. Def
 parser.add_argument('--nogpu', action='store_true', help='Disable GPU usage if you encounter memory issues.')
 parser.add_argument('--ESM_model', help='ESM model to use for generating embeddings. Options: 3B', default='3B')
 parser.add_argument('--embeddings_output', help='If you want to save the generated embeddings, provide a file name. Will save as .npy')
+parser.add_argument('--compare_sklearn', action='store_true', help='Compare torch-based predictions against sklearn outputs and report max absolute difference.')
 
 args = parser.parse_args()
 
@@ -75,6 +76,26 @@ def load_embeddings_from_pt_file(pt_file, layer):
     else:
         raise ValueError(f"The .pt file {pt_file} does not contain the required 'mean_representations' or layer {layer}.\nMake sure to use the `--include mean` flag when extracting embeddings with extract.py")
 
+# Build a torch linear layer that reproduces the sklearn pipeline
+def build_torch_lr(loaded_data):
+    scaler = loaded_data['scaler']
+    feature_indices = loaded_data['feature_indices']
+    lr_model = loaded_data['model']
+
+    mean = scaler.mean_
+    scale = scaler.scale_
+    coef = lr_model.coef_.reshape(-1)
+    intercept = float(lr_model.intercept_[0])
+
+    weight_full = np.zeros_like(mean, dtype=np.float32)
+    weight_full[feature_indices] = coef / scale[feature_indices]
+    bias = intercept - np.sum((coef * mean[feature_indices]) / scale[feature_indices])
+
+    linear = torch.nn.Linear(weight_full.shape[0], 1, bias=True)
+    linear.weight.data = torch.tensor(weight_full, dtype=torch.float32).unsqueeze(0)
+    linear.bias.data = torch.tensor([bias], dtype=torch.float32)
+    return linear
+
 # Main function to process input and generate predictions
 def main():
     if args.ESM_model not in ['3B']:
@@ -119,18 +140,23 @@ def main():
     
     # Load Logistic Regression model
     loaded_data = joblib.load(args.LR_model)
-    LR_model = loaded_data['model']
-    scaler = loaded_data['scaler']
-    feature_indices = loaded_data['feature_indices']
     print("Logistic Regression model loaded successfully.")
 
-    # scale embeddings
-    embeddings_scaled = scaler.transform(embeddings)
-    # select features
-    embeddings_selected = embeddings_scaled[:, feature_indices]
+    # Build a torch linear layer that combines scaling + feature selection + logistic regression
+    torch_lr = build_torch_lr(loaded_data)
+    with torch.no_grad():
+        logits = torch_lr(torch.tensor(embeddings, dtype=torch.float32))
+        predictions = torch.sigmoid(logits).squeeze(1).cpu().numpy()
 
-    # Predict LLPS propensity
-    predictions = LR_model.predict_proba(embeddings_selected)[:, 1]
+    if args.compare_sklearn:
+        LR_model = loaded_data['model']
+        scaler = loaded_data['scaler']
+        feature_indices = loaded_data['feature_indices']
+        embeddings_scaled = scaler.transform(embeddings)
+        embeddings_selected = embeddings_scaled[:, feature_indices]
+        sklearn_predictions = LR_model.predict_proba(embeddings_selected)[:, 1]
+        max_diff = np.max(np.abs(sklearn_predictions - predictions))
+        print(f"Max absolute difference vs sklearn: {max_diff:.6e}")
     if len(names) == 1:
 	    print(f"LLPS probabilities: {predictions[0]:.4f}")
     
