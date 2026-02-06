@@ -1,2 +1,3 @@
 model_development/IDR_embeddings
 model_development/features/non_driver_embeddings.pkl
+*pycache*

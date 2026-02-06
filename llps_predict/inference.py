@@ -1,0 +1,162 @@
+import re
+from pathlib import Path
+from typing import Optional
+
+import esm
+import numpy as np
+import torch
+
+MODEL_NAME_TO_LAYER = {
+    "3B": 36,
+}
+MODEL_NAME_TO_CHECKPOINT = {
+    "3B": "esm2_t36_3B_UR50D.pt",
+}
+
+ALLOWED_AA = set("ACDEFGHIKLMNPQRSTVWYBXZJUO")
+
+
+def is_fasta_path(value: str) -> bool:
+    lower = value.lower()
+    return lower.endswith(".fasta") or lower.endswith(".fa") or lower.endswith(".faa")
+
+
+def sanitize_sequence(seq: str) -> str:
+    seq = re.sub(r"\s+", "", seq).upper()
+    if not seq:
+        raise ValueError("Encountered an empty sequence after whitespace cleanup.")
+    invalid = sorted(set(ch for ch in seq if ch not in ALLOWED_AA))
+    if invalid:
+        raise ValueError(
+            f"Sequence contains invalid residue codes: {''.join(invalid)}. "
+            "Allowed letters are ACDEFGHIKLMNPQRSTVWY and common ambiguous codes BXZJUO."
+        )
+    return seq
+
+
+def parse_fasta(path: Path) -> tuple[list[str], list[str]]:
+    if not path.exists():
+        raise FileNotFoundError(f"FASTA file not found: {path}")
+
+    names: list[str] = []
+    seqs: list[str] = []
+    current_name: Optional[str] = None
+    current_seq: list[str] = []
+
+    with path.open("r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                if current_name is not None:
+                    seqs.append(sanitize_sequence("".join(current_seq)))
+                    names.append(current_name)
+                current_name = line[1:].strip() or f"sequence_{len(names) + 1}"
+                current_seq = []
+            else:
+                if current_name is None:
+                    raise ValueError(
+                        f"Invalid FASTA format in {path}: sequence data appears before first header."
+                    )
+                current_seq.append(line)
+
+    if current_name is not None:
+        seqs.append(sanitize_sequence("".join(current_seq)))
+        names.append(current_name)
+
+    if not names:
+        raise ValueError(f"No FASTA entries found in {path}")
+    return names, seqs
+
+
+def load_inputs(sequence_arg: str) -> tuple[list[str], list[str]]:
+    candidate_path = Path(sequence_arg)
+    if candidate_path.exists() or is_fasta_path(sequence_arg):
+        if not is_fasta_path(sequence_arg):
+            raise ValueError(
+                f"Input path exists but does not look like FASTA: {sequence_arg}. "
+                "Use .fasta/.fa/.faa, or pass a raw sequence string."
+            )
+        return parse_fasta(candidate_path)
+
+    sequence = sanitize_sequence(sequence_arg)
+    return ["sequence_1"], [sequence]
+
+
+def configure_torch_hub_dir(custom_dir: Optional[str]) -> Path:
+    if custom_dir:
+        hub_dir = Path(custom_dir).expanduser().resolve()
+        hub_dir.mkdir(parents=True, exist_ok=True)
+        torch.hub.set_dir(str(hub_dir))
+        return hub_dir
+    return Path(torch.hub.get_dir()).expanduser().resolve()
+
+
+def describe_esm_checkpoint_state(hub_dir: Path, checkpoint_name: str) -> Path:
+    checkpoint_path = hub_dir / "checkpoints" / checkpoint_name
+    if checkpoint_path.exists():
+        print(f"ESM2 checkpoint found: {checkpoint_path}")
+    else:
+        print(
+            "ESM2 checkpoint not found.\n"
+            f"Searched: {checkpoint_path}\n"
+            "Will attempt automatic download via fair-esm now.\n"
+            "If this fails, rerun with --esm_weights_dir <writable_dir> to choose another cache location."
+        )
+    return checkpoint_path
+
+
+def load_esm_model(model_size: str) -> tuple[torch.nn.Module, object, int]:
+    if model_size != "3B":
+        raise ValueError(f"Unsupported ESM2 model: {model_size}")
+    model, alphabet = esm.pretrained.esm2_t36_3B_UR50D()
+    return model, alphabet, MODEL_NAME_TO_LAYER[model_size]
+
+
+def embed_sequences(
+    names: list[str],
+    sequences: list[str],
+    esm_model: torch.nn.Module,
+    alphabet: object,
+    layer: int,
+    use_gpu: bool,
+) -> np.ndarray:
+    batch_converter = alphabet.get_batch_converter()
+    data = list(zip(names, sequences))
+    _, _, batch_tokens = batch_converter(data)
+
+    device = torch.device("cuda") if use_gpu else torch.device("cpu")
+    esm_model = esm_model.to(device)
+    batch_tokens = batch_tokens.to(device)
+
+    with torch.no_grad():
+        outputs = esm_model(batch_tokens, repr_layers=[layer], return_contacts=False)
+
+    reps = outputs["representations"][layer]
+    pooled = [reps[i, 1 : len(seq) + 1].mean(0) for i, seq in enumerate(sequences)]
+    embeddings = torch.stack(pooled).cpu().numpy()
+    return embeddings
+
+
+def load_torch_lr_from_pt(pt_path: str) -> torch.nn.Linear:
+    try:
+        ckpt = torch.load(pt_path, map_location="cpu", weights_only=True)
+    except TypeError:
+        ckpt = torch.load(pt_path, map_location="cpu")
+
+    required_keys = ["embedding_dim", "weight_full", "bias"]
+    missing = [k for k in required_keys if k not in ckpt]
+    if missing:
+        raise ValueError(f"Invalid LR checkpoint {pt_path}; missing keys: {missing}")
+
+    embedding_dim = int(ckpt["embedding_dim"])
+    weight_full = torch.as_tensor(ckpt["weight_full"], dtype=torch.float32).view(1, embedding_dim)
+    bias = torch.as_tensor(ckpt["bias"], dtype=torch.float32).view(1)
+
+    linear = torch.nn.Linear(embedding_dim, 1, bias=True)
+    with torch.no_grad():
+        linear.weight.copy_(weight_full)
+        linear.bias.copy_(bias)
+    linear.eval()
+    return linear
