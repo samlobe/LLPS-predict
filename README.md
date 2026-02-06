@@ -17,6 +17,9 @@ python -c "import torch; print(torch.__version__); print('cuda', torch.cuda.is_a
 
 Expected check output includes `cuda True`.
 
+If you have a NVIDIA GPU and this fails, your driver/GPU/platform likely needs a different CUDA-enabled PyTorch build. Use the official selector to pick a compatible install command:
+https://pytorch.org/get-started/locally/
+
 ### CPU fallback (Mac / no NVIDIA GPU, slower but supported)
 
 ```bash
@@ -71,7 +74,6 @@ llps-predict-per-res \
 ## Notes
 - `--toks_per_batch`: higher is faster but uses more memory.
 - `--truncation_seq_length`: sequences longer than this are truncated for ESM2 inference.
-- `--lr_checkpoint`: if relative, it is searched from both your current directory and the installed project root. You can also set `LLPS_PREDICT_LR_CHECKPOINT`.
 
 ## Export/Update LR Checkpoint
 Inference uses a pure torch `.pt` LR checkpoint.
