@@ -62,7 +62,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=4096,
         help=(
-            "Maximum tokens per embedding batch (extract.py-style batching). "
+            "Maximum tokens per embedding batch. "
             "Higher values are faster but use more memory."
         ),
     )

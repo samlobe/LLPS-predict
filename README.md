@@ -1,14 +1,15 @@
-# LLPSpredict
-This model predicts LLPS propensity for intrinsically disordered proteins/regions using ESM2 embeddings with a logistic-regression head.
+# LLPS-predict
+LLPS propensity prediction for IDRs using ESM2 embeddings and a logistic-regression head.
 
-## Quick Start
-Use a machine with at least 12 GB RAM for ESM2 3B inference. CPU works; GPU is much faster.
+## Install
+Conda-first is recommended for reliable PyTorch setup.
 
 ```bash
 conda create -n LLPS-predict python=3.9
 conda activate LLPS-predict
-pip install fair-esm
 conda install pytorch
+pip install fair-esm
+pip install -e .
 ```
 
 Alternative:
@@ -16,31 +17,65 @@ Alternative:
 ```bash
 conda env create -f environment.yml -n LLPS-predict
 conda activate LLPS-predict
+pip install -e .
 ```
+
+## CLI Commands
+After installation, two console commands are available:
+- `llps-predict`
+- `llps-predict-per-res`
 
 ## Usage
-Single sequence:
+Single sequence score:
 
 ```bash
-python predict.py --sequence YGQSSYSSYGQSQNTGY
+llps-predict --sequence YGQSSYSSYGQSQNTGY
 ```
 
-FASTA with multiple sequences:
+FASTA with many sequences:
 
 ```bash
-python predict.py --sequence example.fasta --output example_sequences_LLPS_propensities.csv
+llps-predict --sequence example.fasta --output example_sequences_LLPS_propensities.csv
 ```
 
-## Notes if you run into memory/length issues
-- `--toks_per_batch`: higher is faster, but uses more memory.
+Efficient token batching for large FASTA inputs:
+
+```bash
+llps-predict \
+  --sequence many_sequences.fasta \
+  --toks_per_batch 4096 \
+  --truncation_seq_length 1022 \
+  --output LLPS_propensity.csv
+```
+
+Per-residue LLPS profile for a single sequence/FASTA entry:
+
+```bash
+llps-predict-per-res \
+  --sequence tau.fasta \
+  --probe_lengths 15 25 40 \
+  --stride 1 \
+  --output tau_perRes_scores.csv
+```
+
+## Notes
+- `--toks_per_batch`: higher is faster but uses more memory.
 - `--truncation_seq_length`: sequences longer than this are truncated for ESM inference.
+- `llps-predict-per-res` requires exactly one input sequence.
 
-## How it works
-1. Generate an ESM2 embedding per sequence.
-2. Apply a logistic-regression head to predict LLPS propensity.
+## Export/Update LR Checkpoint
+Inference uses a pure torch `.pt` LR checkpoint.
+If you retrain the sklearn LR model, export a new checkpoint with:
+
+```bash
+conda install scikit-learn=1.5.1 joblib
+python scripts/export_lr_joblib_to_pt.py \
+  --joblib model_development/LLPS_model_latest.joblib \
+  --out model_development/LLPS_model_latest.pt
+```
 
 ## Acknowledgments
-- The developers of ESM
-- Tesei, Lindorff-Larsen et al. for their [work](https://doi.org/10.1038/s41586-023-07004-5)
+- ESM developers
+- Tesei, Lindorff-Larsen et al. ([paper](https://doi.org/10.1038/s41586-023-07004-5))
 - CD-CODE contributors
 - Scott Shell and Joan-Emma Shea
