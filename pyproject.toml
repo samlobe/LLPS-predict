@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llps-predict"
+version = "0.1.0"
+description = "LLPS propensity prediction with ESM2 + logistic regression"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "LLPS-predict contributors" }
+]
+dependencies = [
+  "numpy>=1.21"
+]
+
+[project.scripts]
+llps-predict = "llps_predict.cli:main"
+llps-predict-per-res = "llps_predict.per_res_cli:main"
+
+[tool.setuptools]
+packages = ["llps_predict"]
