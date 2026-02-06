@@ -57,6 +57,21 @@ def parse_args() -> argparse.Namespace:
             "Weights are searched/downloaded at <dir>/checkpoints/."
         ),
     )
+    parser.add_argument(
+        "--toks_per_batch",
+        type=int,
+        default=4096,
+        help=(
+            "Maximum tokens per embedding batch (extract.py-style batching). "
+            "Higher values are faster but use more memory."
+        ),
+    )
+    parser.add_argument(
+        "--truncation_seq_length",
+        type=int,
+        default=1022,
+        help="Truncate sequences longer than this length for ESM inference.",
+    )
     return parser.parse_args()
 
 
@@ -98,6 +113,8 @@ def main() -> None:
         alphabet=alphabet,
         layer=layer,
         use_gpu=use_gpu,
+        toks_per_batch=args.toks_per_batch,
+        truncation_seq_length=args.truncation_seq_length,
     )
 
     with torch.no_grad():

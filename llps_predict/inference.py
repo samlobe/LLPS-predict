@@ -5,6 +5,7 @@ from typing import Optional
 import esm
 import numpy as np
 import torch
+from esm import FastaBatchedDataset
 
 MODEL_NAME_TO_LAYER = {
     "3B": 36,
@@ -111,6 +112,7 @@ def load_esm_model(model_size: str) -> tuple[torch.nn.Module, object, int]:
     if model_size != "3B":
         raise ValueError(f"Unsupported ESM2 model: {model_size}")
     model, alphabet = esm.pretrained.esm2_t36_3B_UR50D()
+    model.eval()
     return model, alphabet, MODEL_NAME_TO_LAYER[model_size]
 
 
@@ -121,21 +123,54 @@ def embed_sequences(
     alphabet: object,
     layer: int,
     use_gpu: bool,
+    toks_per_batch: int = 4096,
+    truncation_seq_length: int = 1022,
 ) -> np.ndarray:
-    batch_converter = alphabet.get_batch_converter()
-    data = list(zip(names, sequences))
-    _, _, batch_tokens = batch_converter(data)
+    if toks_per_batch <= 0:
+        raise ValueError("--toks_per_batch must be a positive integer.")
+    if truncation_seq_length <= 0:
+        raise ValueError("--truncation_seq_length must be a positive integer.")
+
+    dataset = FastaBatchedDataset(names, sequences)
+    batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
+    batch_converter = alphabet.get_batch_converter(truncation_seq_length)
 
     device = torch.device("cuda") if use_gpu else torch.device("cpu")
     esm_model = esm_model.to(device)
-    batch_tokens = batch_tokens.to(device)
+
+    truncated_count = sum(len(seq) > truncation_seq_length for seq in sequences)
+    if truncated_count > 0:
+        print(
+            f"Warning: {truncated_count} sequence(s) exceed {truncation_seq_length} residues "
+            "and will be truncated for ESM inference."
+        )
+
+    pooled_embeddings: list[Optional[torch.Tensor]] = [None] * len(dataset)
 
     with torch.no_grad():
-        outputs = esm_model(batch_tokens, repr_layers=[layer], return_contacts=False)
+        for batch_idx, batch_indices in enumerate(batches):
+            if len(batches) > 1:
+                print(
+                    f"Embedding batch {batch_idx + 1}/{len(batches)} "
+                    f"({len(batch_indices)} sequences)"
+                )
 
-    reps = outputs["representations"][layer]
-    pooled = [reps[i, 1 : len(seq) + 1].mean(0) for i, seq in enumerate(sequences)]
-    embeddings = torch.stack(pooled).cpu().numpy()
+            batch_records = [dataset[idx] for idx in batch_indices]
+            _, _, batch_tokens = batch_converter(batch_records)
+            if use_gpu:
+                batch_tokens = batch_tokens.to(device=device, non_blocking=True)
+
+            outputs = esm_model(batch_tokens, repr_layers=[layer], return_contacts=False)
+            reps_cpu = outputs["representations"][layer].to(device="cpu")
+
+            for row_idx, seq_idx in enumerate(batch_indices):
+                trunc_len = min(truncation_seq_length, len(dataset.sequence_strs[seq_idx]))
+                pooled_embeddings[seq_idx] = reps_cpu[row_idx, 1 : trunc_len + 1].mean(0).clone()
+
+    if any(emb is None for emb in pooled_embeddings):
+        raise RuntimeError("Failed to compute embeddings for one or more sequences.")
+
+    embeddings = torch.stack([emb for emb in pooled_embeddings if emb is not None]).numpy()
     return embeddings
 
 

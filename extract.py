@@ -6,6 +6,7 @@
 
 import argparse
 import pathlib
+from collections import defaultdict
 
 import torch
 
@@ -61,6 +62,46 @@ def create_parser():
     return parser
 
 
+def load_fasta_batched_dataset_allow_duplicate_labels(fasta_file: pathlib.Path) -> tuple[FastaBatchedDataset, int]:
+    sequence_labels, sequence_strs = [], []
+    cur_seq_label = None
+    buf = []
+
+    def _flush_current_seq():
+        nonlocal cur_seq_label, buf
+        if cur_seq_label is None:
+            return
+        sequence_labels.append(cur_seq_label)
+        sequence_strs.append("".join(buf))
+        cur_seq_label = None
+        buf = []
+
+    with open(fasta_file, "r", encoding="utf-8") as infile:
+        for line_idx, line in enumerate(infile):
+            if line.startswith(">"):
+                _flush_current_seq()
+                label = line[1:].strip()
+                cur_seq_label = label if len(label) > 0 else f"seqnum{line_idx:09d}"
+            else:
+                buf.append(line.strip())
+
+    _flush_current_seq()
+
+    seen = defaultdict(int)
+    unique_labels = []
+    duplicate_count = 0
+    for label in sequence_labels:
+        count = seen[label]
+        if count == 0:
+            unique_labels.append(label)
+        else:
+            unique_labels.append(f"{label}__dup{count}")
+            duplicate_count += 1
+        seen[label] += 1
+
+    return FastaBatchedDataset(unique_labels, sequence_strs), duplicate_count
+
+
 def run(args):
     model, alphabet = pretrained.load_model_and_alphabet(args.model_location)
     model.eval()
@@ -72,12 +113,17 @@ def run(args):
         model = model.cuda()
         print("Transferred model to GPU")
 
-    dataset = FastaBatchedDataset.from_file(args.fasta_file)
+    dataset, duplicate_count = load_fasta_batched_dataset_allow_duplicate_labels(args.fasta_file)
     batches = dataset.get_batch_indices(args.toks_per_batch, extra_toks_per_seq=1)
     data_loader = torch.utils.data.DataLoader(
         dataset, collate_fn=alphabet.get_batch_converter(args.truncation_seq_length), batch_sampler=batches
     )
     print(f"Read {args.fasta_file} with {len(dataset)} sequences")
+    if duplicate_count > 0:
+        print(
+            f"Detected {duplicate_count} duplicate FASTA label(s). "
+            "Added '__dupN' suffixes to keep output file names unique."
+        )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     return_contacts = "contacts" in args.include
