@@ -106,6 +106,10 @@ def main() -> None:
     predict_t0 = perf_counter()
 
     use_gpu = torch.cuda.is_available() and not args.nogpu
+    device_name = "cuda" if use_gpu else "cpu"
+    print(f"Using device: {device_name}")
+    if not use_gpu:
+        print("CPU mode detected. For faster runtime, see README GPU install instructions.")
     embeddings = embed_sequences(
         names=names,
         sequences=sequences,

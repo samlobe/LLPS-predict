@@ -112,6 +112,13 @@ def main() -> None:
     )
 
     use_gpu = torch.cuda.is_available() and not args.nogpu
+    device_name = "cuda" if use_gpu else "cpu"
+    print(f"Using device: {device_name}")
+    if not use_gpu:
+        print(
+            "CPU mode detected. Per-residue runs can be slow on CPU; "
+            "see README GPU install instructions."
+        )
     fragment_scores = predict_fragment_scores(
         fragments=fragments,
         lr_checkpoint=args.lr_checkpoint,
@@ -123,7 +130,6 @@ def main() -> None:
     )
     weights_loading_seconds = perf_counter() - weights_t0
 
-    aggregate_t0 = perf_counter()
     residues, avg_by_length, overall_avg = aggregate_per_residue_scores(
         sequence_length=len(sequence),
         probe_lengths=args.probe_lengths,
@@ -141,12 +147,10 @@ def main() -> None:
 
     write_fragment_scores_csv(args.fragment_scores_output, fragments, fragment_scores)
     write_per_res_scores_csv(args.output, residues, args.probe_lengths, avg_by_length, overall_avg)
-    aggregate_seconds = perf_counter() - aggregate_t0
 
     print(f"Fragment-level LLPS scores saved to {args.fragment_scores_output}")
     print(f"Per-residue LLPS scores saved to {args.output}")
     print(f"Prediction time (s): {weights_loading_seconds:.3f}")
-    print(f"Aggregation/write time (s): {aggregate_seconds:.3f}")
 
 
 if __name__ == "__main__":
