@@ -88,9 +88,9 @@ python scripts/export_lr_joblib_to_pt.py \
 
 ## Additional Manuscript Data
 - Manuscript datasets and minimal reproducibility scripts are in the companion repository:
-  - `https://github.com/samlobe/amyloid-predict/manuscript_data`
+  - `https://github.com/samlobe/amyloid-predict/tree/main/manuscript_data`
 - DOI-backed Zenodo archive for the manuscript snapshot will be listed there:
-  - `https://doi.org/TBD`
+  - `https://doi.org/10.5281/zenodo.18882439`
 
 ## Acknowledgments
 - ESM developers
