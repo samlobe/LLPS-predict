@@ -1,0 +1,15 @@
+Training data notes (LLPS-predict)
+
+This repository includes sequence resources used for LLPS model training and analysis:
+- model_development/compile_IDR_drivers/IDRs.fasta
+- model_development/compile_IDR_drivers/drivers.csv
+- model_development/compile_IDR_drivers/members.csv
+
+Training scripts consume embedding tables (for example driver/non-driver embeddings) and train logistic models.
+
+If regenerating embeddings from FASTA:
+1) Build FASTA matching your target sequence IDs.
+2) Use ESM extraction from the ESM repository:
+   https://github.com/facebookresearch/esm
+   script: scripts/extract.py
+3) Convert extracted embeddings into CSV tables expected by training scripts.
