@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use LLPS-predict, please cite the associated PNAS paper."
+title: "LLPS-predict"
+authors:
+  - family-names: Lobo
+    given-names: Samuel
+    orcid: "https://orcid.org/0000-0002-1162-8798"
+repository-code: "https://github.com/samlobe/LLPS-predict"
+preferred-citation:
+  type: article
+  title: "amyloid-predict and LLPS-predict: Predicting phase separation propensities in the intrinsically disordered proteome"
+  authors:
+  - family-names: Lobo
+    given-names: Samuel
+    orcid: "https://orcid.org/0000-0002-1162-8798"
+  - family-names: Griem
+    given-names: Leif
+  - family-names: Shell
+    given-names: M. Scott
+    orcid: "https://orcid.org/0000-0002-0439-1534"
+  - family-names: Shea
+    given-names: Joan-Emma
+    orcid: "https://orcid.org/0000-0002-9801-9273"
+  doi: "10.1073/pnas.2531932123"
+  date-published: 2026-05-27
+  journal: "Proceedings of the National Academy of Sciences"
+  volume: 123
+  issue: 22
